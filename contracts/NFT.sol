@@ -107,29 +107,12 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
         _safeMint(msg.sender, 1);
     }
 
-    function tokenURI(uint256 tokenId)
-        public
+    function tokenChildrenRUI(uint256 tokenId)
+        internal
         view
-        virtual
-        override
-        returns (string memory)
+        returns (bytes memory)
     {
-        require(_exists(tokenId), "Nonexistent token");
-
-        bytes memory content = abi.encodePacked(
-            '{"name": "AVATAR", "description": "SVG AVATAR"',
-            ', "image_data": "',
-            "data:image/svg+xml;base64,",
-            Base64.encode(
-                abi.encodePacked(
-                    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1094" viewBox="0 0 1024 1094" style="enable-background:new 0 0 1024 1094" xml:space="preserve">',
-                    dp.get(tokenId),
-                    "</svg>"
-                )
-            ),
-            '", "designer": "LUCA355"}'
-        );
-
+        bytes memory content;
         uint256 length = childrenContracts.length;
 
         for (uint256 i = 0; i < length; ++i) {
@@ -170,7 +153,34 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
             }
         }
 
-        content = abi.encodePacked(content, "]}");
+        return content;
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override
+        returns (string memory)
+    {
+        require(_exists(tokenId), "Nonexistent token");
+
+        bytes memory content = abi.encodePacked(
+            '{"name": "AVATAR", "description": "SVG AVATAR"',
+            ', "image_data": "',
+            "data:image/svg+xml;base64,",
+            Base64.encode(
+                abi.encodePacked(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1094" viewBox="0 0 1024 1094" style="enable-background:new 0 0 1024 1094" xml:space="preserve">',
+                    dp.get(tokenId),
+                    "</svg>"
+                )
+            ),
+            '", "designer": "LUCA355", "attributes": [',
+            tokenChildrenRUI(tokenId),
+            "]}"
+        );
+
         return
             string(
                 abi.encodePacked(
