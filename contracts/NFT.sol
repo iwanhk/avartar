@@ -4,8 +4,10 @@ pragma solidity ^0.8.4;
 /*
  */
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./ERC721A.sol";
 import "./Base64.sol";
 
@@ -14,20 +16,13 @@ interface IDataTemplate {
 }
 
 contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
-    struct Docker20 {
-        address contractAddress;
-        uint256 amount;
-    }
-    struct Docker721 {
-        address contractAddress;
-        uint256[] id;
-    }
+    using Strings for uint256;
 
     event Received(address _from, uint256 tokenId);
 
-    uint256[] ids;
-    mapping(uint256 => mapping(address => Docker20)) children20;
-    mapping(uint256 => mapping(address => Docker721)) children721;
+    mapping(uint256 => mapping(address => uint256)) children20;
+    mapping(uint256 => mapping(address => uint256[])) children721;
+    address[] childrenContracts;
 
     IDataTemplate dp;
 
@@ -45,12 +40,13 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
         require(_contract != address(0) && _amount > 0, "Invalid arg");
 
         IERC20 erc20 = IERC20(_contract);
-        if (children20[tokenId][_contract].contractAddress == address(0)) {
+        if (children20[tokenId][_contract] == 0) {
             // new record
-            children20[tokenId][_contract] = Docker20(_contract, _amount);
+            children20[tokenId][_contract] = _amount;
+            childrenContracts.push(_contract);
         } else {
             // found a record
-            children20[tokenId][_contract].amount += _amount;
+            children20[tokenId][_contract] += _amount;
         }
 
         return erc20.transferFrom(msg.sender, address(this), _amount);
@@ -64,15 +60,13 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
         require(_contract != address(0), "Invalid arg");
 
         IERC721 erc721 = IERC721(_contract);
-        if (children721[tokenId][_contract].contractAddress == address(0)) {
+        if (children721[tokenId][_contract].length == 0) {
             // new record
-            children721[tokenId][_contract] = Docker721(
-                _contract,
-                new uint256[](0)
-            );
+            children721[tokenId][_contract] = new uint256[](0);
+            childrenContracts.push(_contract);
         }
         // found a record
-        children721[tokenId][_contract].id.push(_id);
+        children721[tokenId][_contract].push(_id);
 
         return erc721.transferFrom(msg.sender, address(this), _id);
     }
@@ -84,24 +78,32 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
         address _to
     ) external {
         require(ownerOf(tokenId) == msg.sender, "Not Owner");
+        //require(children721[tokenId][_contract].length != 0, "No Children");
 
         IERC721 erc721 = IERC721(_contract);
 
-        uint256[] memory _ids = children721[tokenId][_contract].id;
+        uint256[] memory _ids = children721[tokenId][_contract];
         uint256 size = _ids.length;
+        bool found = false;
 
         for (uint256 i = 0; i < size; i++) {
             if (_ids[i] == _id) {
                 erc721.transferFrom(address(this), _to, _id);
-                return;
+                found = true;
+            }
+            if (found && i < size - 1) {
+                children721[tokenId][_contract][i] = _ids[i + 1];
             }
         }
 
-        revert("Id not found");
+        if (found) {
+            children721[tokenId][_contract].pop();
+        } else {
+            revert("Id not found");
+        }
     }
 
-    function mint(uint256 _id) external payable {
-        ids.push(_id);
+    function mint() external payable {
         _safeMint(msg.sender, 1);
     }
 
@@ -120,14 +122,55 @@ contract avatarNFT is Ownable, ERC721A, IERC721Receiver {
             "data:image/svg+xml;base64,",
             Base64.encode(
                 abi.encodePacked(
-                    '<svg xmlns="htdp://www.w3.org/2000/svg" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512" xml:space="preserve">',
-                    dp.get(ids[tokenId]),
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1094" viewBox="0 0 1024 1094" style="enable-background:new 0 0 1024 1094" xml:space="preserve">',
+                    dp.get(tokenId),
                     "</svg>"
                 )
             ),
             '", "designer": "LUCA355"}'
         );
 
+        uint256 length = childrenContracts.length;
+
+        for (uint256 i = 0; i < length; ++i) {
+            address _contract = childrenContracts[i];
+
+            if (children721[tokenId][_contract].length != 0) {
+                // Fount ERC721 child
+                IERC721Metadata erc721 = IERC721Metadata(_contract);
+
+                content = abi.encodePacked(
+                    content,
+                    '{"trait_type": "ERC721 Assets.',
+                    erc721.name(),
+                    '", "value": "',
+                    children721[tokenId][_contract].length.toString(),
+                    '"},'
+                );
+            }
+            if (children20[tokenId][_contract] != 0) {
+                // Fount ERC20  child
+                IERC20Metadata erc20 = IERC20Metadata(_contract);
+
+                content = abi.encodePacked(
+                    content,
+                    '{"trait_type": "ERC20 Assets.',
+                    erc20.name(),
+                    '", "value": "',
+                    children20[tokenId][_contract].toString(),
+                    '"},'
+                );
+            }
+        }
+
+        if (length > 0) {
+            // remove the last ','
+            assembly {
+                mstore(content, sub(mload(content), 1))
+            }
+        }
+
+        content = abi.encodePacked(content, "]}");
         return
             string(
                 abi.encodePacked(

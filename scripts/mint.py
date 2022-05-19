@@ -12,7 +12,9 @@ def main():
             template = DataTemplate.deploy(addr(admin))
             nft = avatarNFT.deploy(template, addr(admin))
 
-            nft.mint(0)
+            nft.mint()
+            nft.mint()
+            nft.mint()
 
         if active_network in TEST_NETWORKS:
             template = DataTemplate.deploy(addr(admin))
