@@ -7,7 +7,7 @@ contract DataTemplate is Ownable {
     bytes[] private store;
     uint16[] private size;
 
-    function input(bytes calldata _data, uint16 _size) external onlyOwner returns (uint256){
+    function upload(bytes calldata _data, uint16 _size) external onlyOwner returns (uint256){
         require(_data.length>0, "data is empty");
         store.push(_data);
         size.push(_size);

@@ -9,14 +9,14 @@ def main():
 
     try:
         if active_network in LOCAL_NETWORKS:
-            template= AvatarTemplate.deploy(addr(admin))
-            nft= avatarNFT.deploy(template, addr(admin))
+            template = DataTemplate.deploy(addr(admin))
+            nft = avatarNFT.deploy(template, addr(admin))
 
             nft.mint(0)
 
         if active_network in TEST_NETWORKS:
-            template= AvatarTemplate.deploy(addr(admin))
-            nft= avatarNFT.deploy(template, addr(admin))
+            template = DataTemplate.deploy(addr(admin))
+            nft = avatarNFT.deploy(template, addr(admin))
 
             nft.mint(0)
 
