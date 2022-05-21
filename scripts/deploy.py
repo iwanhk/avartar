@@ -9,12 +9,12 @@ def main():
 
     try:
         if active_network in LOCAL_NETWORKS:
-            template= AvartatTemplate.deploy(addr(admin))
-            nft= avatarNFT.deploy(template, addr(admin))
+            template = DataTemplate.deploy(addr(admin))
+            nft = avatarNFT.deploy(template, addr(admin))
 
         if active_network in TEST_NETWORKS:
-            template= AvartatTemplate.deploy(addr(admin))
-            nft= avatarNFT.deploy(template, addr(admin))
+            template = DataTemplate.deploy(addr(admin))
+            nft = avatarNFT.deploy(template, addr(admin))
 
     except Exception:
         console.print_exception()
