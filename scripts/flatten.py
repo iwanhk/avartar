@@ -8,11 +8,13 @@ def main():
     admin, creator, consumer, iwan = get_accounts(active_network)
 
     try:
-        ic = iColors.deploy(addr(admin))
-        iColorsNFT.deploy(ic, addr(admin))
+        template = DataTemplate.deploy(addr(admin))
+        component = componentNFT.deploy(template, addr(admin))
+        nft = avatarNFT.deploy(component, addr(admin))
 
-        flat_contract('iColorsNFT', iColorsNFT.get_verification_info())
-        flat_contract('iColors', iColors.get_verification_info())
+        flat_contract('DataTemplate', DataTemplate.get_verification_info())
+        flat_contract('componentNFT', componentNFT.get_verification_info())
+        flat_contract('avatarNFT', avatarNFT.get_verification_info())
 
     except Exception:
         console.print_exception()
