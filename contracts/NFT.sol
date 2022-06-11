@@ -104,11 +104,14 @@ contract componentNFT is ERC721A, Ownable {
         _svg = abi.encodePacked(ComponentSVG.unpack(_size), _svg);
 
         bytes memory content = abi.encodePacked(
-            '{"name": "AVATAR", "description": "AVATAR UGC system"',
-            ', "image_data": "',
+            '{"name": "Component#',
+            tokenId.toString(),
+            '", "description": "',
+            keys[tokenId],
+            '", "image_data": "',
             "data:image/svg+xml;base64,",
             Base64.encode(abi.encodePacked(_svg)),
-            '", "designer": "LUCA355"}'
+            '", "designer": "LUCA355.xyz"}'
         );
 
         return
@@ -166,7 +169,9 @@ contract avatarNFT is ERC998 {
         require(_exists(tokenId), "Nonexistent token");
 
         bytes memory content = abi.encodePacked(
-            '{"name": "AVATAR", "description": "AVATAR UGC system"',
+            '{"name": "AVATAR#',
+            tokenId.toString(),
+            '", "description": "AVATAR UGC system"',
             ', "image_data": "',
             "data:image/svg+xml;base64,",
             Base64.encode(
