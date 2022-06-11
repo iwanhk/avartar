@@ -10,11 +10,16 @@ def main():
     try:
         if active_network in LOCAL_NETWORKS:
             template = DataTemplate.deploy(addr(admin))
-            nft = avatarNFT.deploy(template, addr(admin))
+            component = componentNFT.deploy(template, addr(admin))
+            nft = avatarNFT.deploy(component, addr(admin))
+
+            loadComponentData("svgs", template, admin)
 
         if active_network in TEST_NETWORKS:
-            template = DataTemplate.deploy(addr(admin))
-            nft = avatarNFT.deploy(template, addr(admin))
+            #template = DataTemplate.deploy(addr(admin))
+            template = DataTemplate[-1]
+            component = componentNFT.deploy(template, addr(admin))
+            nft = avatarNFT.deploy(component, addr(admin))
 
     except Exception:
         console.print_exception()

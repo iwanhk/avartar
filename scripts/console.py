@@ -9,10 +9,14 @@ def main():
 
     try:
         if active_network in LOCAL_NETWORKS:
-            ic = iColorsNFT.deploy(addr(admin))
+            template = DataTemplate[-1]
+            cpm = componentNFT[-1]
+            nft = avatarNFT[-1]
 
         if active_network in TEST_NETWORKS:
-            ic = iColorsNFT[-1]
+            template = DataTemplate[-1]
+            cpm = componentNFT[-1]
+            nft = avatarNFT[-1]
 
     except Exception:
         console.print_exception()

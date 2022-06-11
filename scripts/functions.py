@@ -1,4 +1,4 @@
-from brownie import DataTemplate, avatarNFT, accounts, network, config
+from brownie import DataTemplate, componentNFT, avatarNFT, accounts, network, config
 from scripts.tools import *
 import os
 import zlib
@@ -74,20 +74,41 @@ def chrome():
 
 def deflate(data, compresslevel=9):
     compress = zlib.compressobj(
-            compresslevel,        # level: 0-9
-            zlib.DEFLATED,        # method: must be DEFLATED
-            -zlib.MAX_WBITS,      # window size in bits:
-                                  #   -15..-8: negate, suppress header
-                                  #   8..15: normal
-                                  #   16..30: subtract 16, gzip header
-            zlib.DEF_MEM_LEVEL,   # mem level: 1..8/9
-            0                     # strategy:
-                                  #   0 = Z_DEFAULT_STRATEGY
-                                  #   1 = Z_FILTERED
-                                  #   2 = Z_HUFFMAN_ONLY
-                                  #   3 = Z_RLE
-                                  #   4 = Z_FIXED
+        compresslevel,        # level: 0-9
+        zlib.DEFLATED,        # method: must be DEFLATED
+        -zlib.MAX_WBITS,      # window size in bits:
+        #   -15..-8: negate, suppress header
+        #   8..15: normal
+        #   16..30: subtract 16, gzip header
+        zlib.DEF_MEM_LEVEL,   # mem level: 1..8/9
+        0                     # strategy:
+        #   0 = Z_DEFAULT_STRATEGY
+        #   1 = Z_FILTERED
+        #   2 = Z_HUFFMAN_ONLY
+        #   3 = Z_RLE
+        #   4 = Z_FIXED
     )
     deflated = compress.compress(data)
     deflated += compress.flush()
     return deflated
+
+
+def makeInt(x, y, width=100, height=100):
+    return y + x*(2 << 63) + (height+y)*(2 << 127) + (width+x)*(2 << 191)
+
+
+def loadComponentData(dir, template, user):
+    files = os.listdir(dir)
+    for file in files:  # 遍历文件夹
+        # 判断是否是文件夹，不是文件夹才打开
+        if not os.path.isdir(file) and file[-4:] == '.svg':
+            with open(dir + "/" + file) as f:
+                buffer = f.read()
+                # remove the first line
+                buffer = buffer[buffer.index('\n')+1:]
+                compress_data = deflate(str.encode(buffer))
+                file = file[:file.index('-svgrepo-com.svg')]
+                template.upload(file, compress_data, len(buffer), addr(user))
+                # tx.wait(1)
+                print(
+                    f"{file} {len(buffer)} compressed to {int(len(compress_data)*100/len(buffer))}%")

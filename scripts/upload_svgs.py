@@ -37,28 +37,7 @@ def main():
                 f"Total {len(ids)} component(s) minted for [{nft.totalSupply()-1}]")
 
         if active_network in TEST_NETWORKS:
-            component = componentNFT[-1]
-            nft = avatarNFT[-1]
-
-            ids = []
-            files = os.listdir("svgs")
-            total_components = random.randint(1, 5)
-            for file in files:  # 遍历文件夹
-                # 判断是否是文件夹，不是文件夹才打开
-                if not os.path.isdir(file) and file[-4:] == '.svg':
-                    if total_components == 0:
-                        break
-                    file = file[:file.index('-svgrepo-com.svg')]
-                    total_components -= 1
-                    id = component.totalSupply()
-                    ids.append(id)
-                    component.mint(makeInt(random.randint(
-                        0, 400), random.randint(0, 400)), file, addr(creator))
-                    component.approve(nft, id, addr(creator))
-
-            nft.mint(makeInt(0, 0, 1024, 1024), ids, addr(creator))
-            print(
-                f"Total {len(ids)} component(s) minted for [{nft.totalSupply()-1}]")
+            loadComponentData("svgs", DataTemplate[-1], admin)
 
     except Exception:
         console.print_exception()

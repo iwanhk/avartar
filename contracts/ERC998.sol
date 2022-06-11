@@ -6,98 +6,54 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "./ERC721A.sol";
-import "./Base64.sol";
 
 abstract contract ERC998 is ERC721A, IERC721Receiver {
     using Strings for uint256;
-
-    enum assetType {
-        ERC20,
-        ERC721
-    }
     struct assetItem {
-        assetType type0;
         address contract0;
-        uint256 amount;
         uint256[] ids;
     }
 
     event Received(address _from, uint256 tokenId);
 
-    mapping(uint256 => mapping(address => uint256)) children20;
     mapping(uint256 => mapping(address => uint256[])) children721;
+    mapping(address => uint256) dockAssets;
     address[] childrenContracts;
 
-    function dockERC20(
-        uint256 tokenId,
-        address _contract,
-        uint256 _amount
-    ) external returns (bool) {
-        require(_contract != address(0) && _amount > 0, "Invalid arg");
-
-        IERC20 erc20 = IERC20(_contract);
-        if (children20[tokenId][_contract] == 0) {
-            // new record
-            children20[tokenId][_contract] = _amount;
-            childrenContracts.push(_contract);
-        } else {
-            // found a record
-            children20[tokenId][_contract] += _amount;
-        }
-
-        return erc20.transferFrom(msg.sender, address(this), _amount);
-    }
-
-    function undockERC20(
-        uint256 tokenId,
-        address _contract,
-        address _to,
-        uint256 _amount
-    ) external returns (bool) {
-        require(
-            _contract != address(0) && _to != address(0) && _amount > 0,
-            "Invalid arg"
-        );
-
-        IERC20 erc20 = IERC20(_contract);
-        if (children20[tokenId][_contract] < _amount) {
-            revert("No enough tokens left");
-        } else {
-            children20[tokenId][_contract] -= _amount;
-        }
-
-        return erc20.transferFrom(address(this), _to, _amount);
-    }
-
-    function dockERC721(
+    function dockAsset(
         uint256 tokenId,
         address _contract,
         uint256 _id
-    ) external {
+    ) public {
         require(_contract != address(0), "Invalid arg");
+
+        if (dockAssets[_contract] == 0) {
+            childrenContracts.push(_contract);
+        }
 
         IERC721 erc721 = IERC721(_contract);
         if (children721[tokenId][_contract].length == 0) {
             // new record
             children721[tokenId][_contract] = new uint256[](0);
-            childrenContracts.push(_contract);
         }
         // found a record
         children721[tokenId][_contract].push(_id);
+        dockAssets[_contract] += 1;
 
         return erc721.transferFrom(msg.sender, address(this), _id);
     }
 
-    function undockERC721(
+    function undockAsset(
         uint256 tokenId,
         address _contract,
         uint256 _id,
         address _to
-    ) external {
+    ) public {
         require(ownerOf(tokenId) == msg.sender, "Not Owner");
+        require(dockAssets[_contract] > 0, "No asset left");
         //require(children721[tokenId][_contract].length != 0, "No Children");
 
         IERC721 erc721 = IERC721(_contract);
@@ -118,23 +74,29 @@ abstract contract ERC998 is ERC721A, IERC721Receiver {
 
         if (found) {
             children721[tokenId][_contract].pop();
+            dockAssets[_contract] -= 1;
         } else {
-            revert("Id not found");
+            revert("Asset not found");
         }
     }
 
     function tokenChildrenURI(uint256 tokenId)
         internal
         view
+        virtual
         returns (bytes memory)
     {
-        bytes memory content;
+        bytes memory content = "";
         uint256 length = childrenContracts.length;
 
         for (uint256 i = 0; i < length; ++i) {
             address _contract = childrenContracts[i];
+            if (dockAssets[_contract] == 0) {
+                continue;
+            }
+            uint256[] memory _ids = children721[tokenId][_contract];
 
-            if (children721[tokenId][_contract].length != 0) {
+            if (_ids.length != 0) {
                 // Fount ERC721 child
                 IERC721Metadata erc721 = IERC721Metadata(_contract);
 
@@ -143,26 +105,13 @@ abstract contract ERC998 is ERC721A, IERC721Receiver {
                     '{"trait_type": "ERC721 Assets.',
                     erc721.name(),
                     '", "value": "',
-                    children721[tokenId][_contract].length.toString(),
-                    '"},'
-                );
-            }
-            if (children20[tokenId][_contract] != 0) {
-                // Fount ERC20  child
-                IERC20Metadata erc20 = IERC20Metadata(_contract);
-
-                content = abi.encodePacked(
-                    content,
-                    '{"trait_type": "ERC20 Assets.',
-                    erc20.name(),
-                    '", "value": "',
-                    children20[tokenId][_contract].toString(),
+                    _ids.length.toString(),
                     '"},'
                 );
             }
         }
 
-        if (length > 0) {
+        if (content.length > 0) {
             // remove the last ','
             assembly {
                 mstore(content, sub(mload(content), 1))
@@ -172,8 +121,27 @@ abstract contract ERC998 is ERC721A, IERC721Receiver {
         return content;
     }
 
+    function transferAsset(uint256 tokenId, uint256 _newId) internal {
+        uint256 size = childrenContracts.length;
+
+        for (uint256 i = 0; i < size; i++) {
+            address _contract = childrenContracts[i];
+            uint256[] memory _ids = children721[tokenId][_contract];
+
+            if (children721[_newId][_contract].length == 0) {
+                children721[_newId][_contract] = new uint256[](0);
+            }
+
+            for (uint256 j = 0; j < _ids.length; j++) {
+                children721[_newId][_contract].push(_ids[j]);
+            }
+
+            delete children721[tokenId][_contract];
+        }
+    }
+
     function assets(uint256 tokenId)
-        internal
+        public
         view
         returns (assetItem[] memory assetList)
     {
@@ -183,22 +151,14 @@ abstract contract ERC998 is ERC721A, IERC721Receiver {
 
         for (uint256 i = 0; i < size; i++) {
             address _contract = childrenContracts[i];
-            if (children20[tokenId][_contract] != 0) {
-                _buffer[_pointer].amount = children20[tokenId][_contract];
-                _buffer[_pointer].contract0 = _contract;
-                _buffer[_pointer].type0 = assetType.ERC20;
-                _pointer++;
+            if (dockAssets[_contract] == 0) {
+                continue;
             }
-        }
-        for (uint256 i = 0; i < size; i++) {
-            address _contract = childrenContracts[i];
             uint256[] memory _ids = children721[tokenId][_contract];
 
             if (children721[tokenId][_contract].length != 0) {
                 _buffer[_pointer].ids = _ids;
                 _buffer[_pointer].contract0 = _contract;
-                _buffer[_pointer].type0 = assetType.ERC721;
-                _buffer[_pointer].amount = _ids.length;
                 _pointer++;
             }
         }
@@ -208,6 +168,10 @@ abstract contract ERC998 is ERC721A, IERC721Receiver {
             assetList[_pointer - 1] = _buffer[_pointer - 1];
             _pointer--;
         }
+    }
+
+    function assets(address _contract) public view returns (uint256) {
+        return dockAssets[_contract];
     }
 
     function onERC721Received(
