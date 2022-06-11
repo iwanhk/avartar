@@ -4,41 +4,47 @@ import "./InflateLib.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DataTemplate is Ownable {
-    bytes[] private store;
-    uint16[] private size;
-
-    function upload(bytes calldata _data, uint16 _size)
-        external
-        onlyOwner
-        returns (uint256)
-    {
-        require(_data.length > 0, "data is empty");
-        store.push(_data);
-        size.push(_size);
-        return store.length - 1;
+    struct data {
+        bytes data;
+        uint16 size;
+        address owner;
     }
 
-    function update(
-        uint256 id,
+    mapping(string => data) database;
+    uint256 public total = 0;
+
+    function upload(
+        string calldata _key,
         bytes calldata _data,
         uint16 _size
-    ) external onlyOwner {
-        require(_data.length > 0, "data is empty");
-        store[id] = _data;
-        size[id] = _size;
+    ) external {
+        if (database[_key].owner == address(0)) {
+            database[_key] = data(_data, _size, msg.sender);
+            total += 1;
+            return;
+        }
+        if (database[_key].owner == msg.sender) {
+            database[_key].data = _data;
+            database[_key].size = _size;
+            return;
+        }
+        if (_data.length == 0 && database[_key].owner == msg.sender) {
+            delete database[_key];
+            total -= 1;
+        }
+        revert("this key had been used");
     }
 
-    function get(uint256 id) external view returns (string memory) {
+    function get(string calldata _key) external view returns (string memory) {
         InflateLib.ErrorCode code;
         bytes memory buffer;
-        (code, buffer) = InflateLib.puff(store[id], size[id]);
+        (code, buffer) = InflateLib.puff(
+            database[_key].data,
+            database[_key].size
+        );
         if (code == InflateLib.ErrorCode.ERR_NONE) {
             return string(buffer);
         }
         return "";
-    }
-
-    function total() external view returns (uint256) {
-        return store.length;
     }
 }
